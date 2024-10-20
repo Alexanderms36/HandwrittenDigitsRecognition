@@ -1,17 +1,20 @@
-import theano
+import aesara
 import numpy
 import gzip
 import pickle
-
-import theano.tensor
-import theano.tensor.shared_randomstreams
+import aesara.tensor.nnet as nnet
+import aesara.tensor.signal as signal
+from aesara.tensor.signal import downsample
 
 
 def linear(z):
     return z
 
 def ReLU(z):
-    return theano.tensor.maximum(0.0, z)
+    return aesara.tensor.maximum(0.0, z)
+
+def sigmoid(z):
+    return 1 / (1 + aesara.tensor.exp(-z))
 
 def load_data_shared(filename="../data/mnist.pkl.gz"):
     f = gzip.open(filename, 'rb')
@@ -20,23 +23,24 @@ def load_data_shared(filename="../data/mnist.pkl.gz"):
     training_data, validation_data, test_data = u.load()
     f.close()
     def shared(data):
-        shared_x = theano.shared(
-            numpy.asarray(data[0], dtype=theano.config.floatX), borrow=True
+        shared_x = aesara.shared(
+            numpy.asarray(data[0], dtype=aesara.config.floatX), borrow=True
         )
-        shared_y = theano.shared(
-            numpy.asarray(data[0], dtype=theano.config.floatX), borrow=True
+        shared_y = aesara.shared(
+            numpy.asarray(data[0], dtype=aesara.config.floatX), borrow=True
         )
-        return shared_x, theano.tensor.cast(shared_y, "int32")
+        return shared_x, aesara.tensor.cast(shared_y, "int32")
     return [shared(training_data), shared[validation_data], shared(test_data)]
 
+print(f'aesara version: {aesara.__version__}')
 
 class Network(object):
     def __init__(self, layers, mini_batch_size):
         self.layers = layers
         self.mini_batch_size = mini_batch_size
         self.params = [param for layer in self.layers for param in layer.params]
-        self.x = theano.tensor.matrix("x")
-        self.y = theano.tensor.ivector("y")
+        self.x = aesara.tensor.matrix("x")
+        self.y = aesara.tensor.ivector("y")
         init_layer = self.layers[0]
         init_layer.set_inpt(self.x, self.x, self.mini_batch_size)
         for i in range(1, len(self.layers)):
@@ -60,12 +64,12 @@ class Network(object):
         l2_norm_squared = sum([(layer.w**2).sum() for layer in self.layers])
         cost = self.layers[-1].cost(self) + \
               0.5 * lmbda * l2_norm_squared / num_training_batches
-        grads = theano.tensor.grad(cost, self.params)
+        grads = aesara.tensor.grad(cost, self.params)
         updates = [(param, param - eta * grad)
                    for param, grad in zip(self.params, grads)]
         
-        i = theano.tensor.lscalar()
-        train_mb = theano.function(
+        i = aesara.tensor.lscalar()
+        train_mb = aesara.function(
             [i],
             cost,
             updates=updates,
@@ -77,7 +81,7 @@ class Network(object):
             }
         )
 
-        validate_mb_accuracy = theano.function(
+        validate_mb_accuracy = aesara.function(
             [i],
             self.layers[-1].accuracy(self.y),
             givens={
@@ -88,7 +92,7 @@ class Network(object):
             }
         )
 
-        test_mb_accuracy = theano.function(
+        test_mb_accuracy = aesara.function(
             [i],
             self.layers[-1].accuracy(self.y),
             givens={
@@ -99,7 +103,7 @@ class Network(object):
             }
         )
 
-        self.test_mb_predictions = theano.function(
+        self.test_mb_predictions = aesara.function(
             [i],
             self.layers[-1].y_out(),
             givens={
@@ -143,17 +147,17 @@ class ConvPoolLayer(object):
         self.activation_fn = activation_fn
 
         n_out = (filter_shape[0] * numpy.prod(filter_shape[2:]) / numpy.prod(poolsize))
-        self.w = theano.shared(
+        self.w = aesara.shared(
             numpy.asarray(
                 numpy.random.normal(loc=0, scale=numpy.sqrt(1.0/n_out), size=filter_shape),
-                dtype=theano.config.floatX
+                dtype=aesara.config.floatX
             ),
             borrow=True
         )
-        self.b = theano.shared(
+        self.b = aesara.shared(
             numpy.asarray(
                 numpy.random.normal(loc=0, scale=1.0, size=(filter_shape[0],)),
-                dtype=theano.config.floatX
+                dtype=aesara.config.floatX
             ),
             borrow=True
         )
@@ -162,19 +166,19 @@ class ConvPoolLayer(object):
     def set_inpt(self, inpt, inpt_dropout, mini_batch_size):
         self.inpt = inpt.reshape(self.image_shape)
 
-        conv_out = theano.tensor.nnet.conv.conv2d(
+        conv_out = nnet.conv.conv2d(
             input = self.inpt,
             filters=self.w,
             filter_shape=self.filter_shape,
             image_shape=self.image_shape
         )
 
-        pooled_out = theano.tensor.signal.downsample.max_pool_2d(
+        pooled_out = downsample.max_pool_2d(
             input=conv_out,
             ds=self.poolsize,
             ignore_border=True
         )
-
+        
         self.output = self.activation_fn(
             pooled_out + self.b.dimshuffle('x', 0, 'x', 'x')
         )
@@ -183,26 +187,26 @@ class ConvPoolLayer(object):
 
 
 class FullyConnectedLayer(object):
-    def __init__(self, n_in, n_out, activation_fn=theano.tensor.nnet.sigmoid, p_dropout=0.0):
+    def __init__(self, n_in, n_out, activation_fn=sigmoid, p_dropout=0.0):
         self.n_in = n_in
         self.n_out = n_out
         self.activation_fn = activation_fn
         self.p_dropout = p_dropout
 
-        self.w = theano.shared(
+        self.w = aesara.shared(
             numpy.asarray(
                 numpy.random.normal(
-                    loc=0.0, scale=numpy.sqrt(1.0/n_out), size=(n_in, n_out)
+                    loc=0.0, scale=numpy.sqrt(1.0/n_in), size=(n_in, n_out)
                 ),
-                dtype=theano.config.floatX
+                dtype=aesara.config.floatX
             ),
             name='w',
             borrow=True
         )
-        self.b = theano.shared(
+        self.b = aesara.shared(
             numpy.asarray(
                 numpy.random.normal(loc=0.0, scale=1.0, size=(n_out,)),
-                dtype=theano.config.floatX
+                dtype=aesara.config.floatX
             ),
             name='b',
             borrow=True
@@ -212,19 +216,19 @@ class FullyConnectedLayer(object):
     def set_inpt(self, inpt, inpt_dropout, mini_batch_size):
         self.inpt = inpt.reshape((mini_batch_size, self.n_in))
         self.output = self.activation_fn(
-            (1 - self.p_dropout) * theano.tensor.dot(self.inpt, self.w) + self.b
+            (1 - self.p_dropout) * aesara.tensor.dot(self.inpt, self.w) + self.b
         )
-        self.y_out = theano.tensor.argmax(self.output, axis=1)
-        self.inpt_dropout = theano.tensor.nnet.dropout_layer(
+        self.y_out = aesara.tensor.argmax(self.output, axis=1)
+        self.inpt_dropout = aesara.tensor.nnet.dropout_layer(
             inpt_dropout.reshape((mini_batch_size, self.n_in)),
             self.p_dropout
         )
         self.output_dropout = self.activation_fn(
-            theano.tensor.dot(self.inpt_dropout, self.w) + self.b
+            aesara.tensor.dot(self.inpt_dropout, self.w) + self.b
         )
     
     def accuracy(self, y):
-        return theano.tensor.mean(theano.tensor.eq(y, self.y_out))
+        return aesara.tensor.mean(aesara.tensor.eq(y, self.y_out))
     
 
 class SoftmaxLayer(object):
@@ -233,13 +237,13 @@ class SoftmaxLayer(object):
         self.n_out = n_out
         self.p_dropout = p_dropout
 
-        self.w = theano.shared(
-            numpy.zeros((n_in, n_out), dtype=theano.config.floatX),
+        self.w = aesara.shared(
+            numpy.zeros((n_in, n_out), dtype=aesara.config.floatX),
             name='w',
             borrow=True
         )
-        self.b = theano.shared(
-            numpy.zeros((n_out,), dtype=theano.config.floatX),
+        self.b = aesara.shared(
+            numpy.zeros((n_out,), dtype=aesara.config.floatX),
             name='b',
             borrow=True
         )
@@ -247,34 +251,34 @@ class SoftmaxLayer(object):
 
     def set_inpt(self, inpt, inpt_dropout, mini_batch_size):
         self.inpt = inpt.reshape((mini_batch_size, self.n_in))
-        self.output = theano.tensor.nnet.softmax(
-            (1 - self.p_dropout) * theano.tensor.dot(self.inpt, self.w) + self.b
+        self.output = aesara.tensor.nnet.softmax(
+            (1 - self.p_dropout) * aesara.tensor.dot(self.inpt, self.w) + self.b
         )
-        self.y_out = theano.tensor.argmax(self.output, axis=1)
-        self.inpt_dropout = theano.tensor.nnet.dropout_layer(
+        self.y_out = aesara.tensor.argmax(self.output, axis=1)
+        self.inpt_dropout = aesara.tensor.nnet.dropout_layer(
             inpt_dropout.reshape((mini_batch_size, self.n_in)),
             self.p_dropout
         )
-        self.output_dropout = theano.tensor.nnet.softmax(
-            theano.tensor.dot(self.inpt_dropout, self.w) + self.b
+        self.output_dropout = aesara.tensor.nnet.softmax(
+            aesara.tensor.dot(self.inpt_dropout, self.w) + self.b
         )
 
     def cost(self, net):
-        return -theano.tensor.mean(
-            theano.tensor.log(self.output_dropout)[theano.tensor.arrange(net.y.shape[0]),
+        return -aesara.tensor.mean(
+            aesara.tensor.log(self.output_dropout)[aesara.tensor.arrange(net.y.shape[0]),
                                                     net.y]
         )
     
     def accuracy(self, y):
-        return theano.tensor.mean(theano.tensor.eq(y, self.y_out))
+        return aesara.tensor.mean(aesara.tensor.eq(y, self.y_out))
     
 
 def size(data):
     return data[0].get_value(borrow=True).shape[0]
 
 def dropout_layer(layer, p_dropout):
-    srng = theano.tensor.shared_randomstreams.RandomStreams(
+    srng = aesara.tensor.shared_randomstreams.RandomStreams(
         numpy.random.RandomState(0).randint(999999)
     )
     mask = srng.binomial(n=1, p=1-p_dropout, size=layer.shape)
-    return layer * theano.tensor.cast(mask, theano.config.floatX)
+    return layer * aesara.tensor.cast(mask, aesara.config.floatX)
