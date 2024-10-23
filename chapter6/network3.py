@@ -4,7 +4,9 @@ import gzip
 import pickle
 import aesara.tensor.nnet as nnet
 import aesara.tensor.signal as signal
-from aesara.tensor.signal import downsample
+# from aesara.tensor.signal import downsample
+from aesara.tensor.signal import pool
+from .dropout_layer import drp_lr
 
 
 def linear(z):
@@ -16,7 +18,7 @@ def ReLU(z):
 def sigmoid(z):
     return 1 / (1 + aesara.tensor.exp(-z))
 
-def load_data_shared(filename="../data/mnist.pkl.gz"):
+def load_data_shared(filename="./data/mnist.pkl.gz"):
     f = gzip.open(filename, 'rb')
     u = pickle._Unpickler(f)
     u.encoding = 'latin1'
@@ -27,10 +29,10 @@ def load_data_shared(filename="../data/mnist.pkl.gz"):
             numpy.asarray(data[0], dtype=aesara.config.floatX), borrow=True
         )
         shared_y = aesara.shared(
-            numpy.asarray(data[0], dtype=aesara.config.floatX), borrow=True
+            numpy.asarray(data[1], dtype=aesara.config.floatX), borrow=True
         )
         return shared_x, aesara.tensor.cast(shared_y, "int32")
-    return [shared(training_data), shared[validation_data], shared(test_data)]
+    return [shared(training_data), shared(validation_data), shared(test_data)]
 
 print(f'aesara version: {aesara.__version__}')
 
@@ -173,12 +175,12 @@ class ConvPoolLayer(object):
             image_shape=self.image_shape
         )
 
-        pooled_out = downsample.max_pool_2d(
+        pooled_out = pool.pool_2d(
             input=conv_out,
             ds=self.poolsize,
             ignore_border=True
         )
-        
+
         self.output = self.activation_fn(
             pooled_out + self.b.dimshuffle('x', 0, 'x', 'x')
         )
@@ -219,10 +221,20 @@ class FullyConnectedLayer(object):
             (1 - self.p_dropout) * aesara.tensor.dot(self.inpt, self.w) + self.b
         )
         self.y_out = aesara.tensor.argmax(self.output, axis=1)
-        self.inpt_dropout = aesara.tensor.nnet.dropout_layer(
-            inpt_dropout.reshape((mini_batch_size, self.n_in)),
-            self.p_dropout
-        )
+
+        #
+        # srng = RandomStream(seed=42)
+        # reshaped_input = inpt_dropout.reshape((mini_batch_size, self.n_in))
+        # dropout_mask = srng.binomial(n=1, size=reshaped_input.shape, p=1 - self.p_dropout)
+        # self.inpt_dropout = reshaped_input * dropout_mask / (1 - self.p_dropout)
+
+        self.inpt_dropout = drp_lr(inpt_dropout, mini_batch_size, self.p_dropout, self.n_in)
+
+        # self.inpt_dropout = aesara.tensor.nnet.dropout_layer(
+        #     inpt_dropout.reshape((mini_batch_size, self.n_in)),
+        #     self.p_dropout
+        # )
+
         self.output_dropout = self.activation_fn(
             aesara.tensor.dot(self.inpt_dropout, self.w) + self.b
         )
@@ -255,10 +267,14 @@ class SoftmaxLayer(object):
             (1 - self.p_dropout) * aesara.tensor.dot(self.inpt, self.w) + self.b
         )
         self.y_out = aesara.tensor.argmax(self.output, axis=1)
-        self.inpt_dropout = aesara.tensor.nnet.dropout_layer(
-            inpt_dropout.reshape((mini_batch_size, self.n_in)),
-            self.p_dropout
-        )
+
+
+        self.inpt_dropout = drp_lr(inpt_dropout, mini_batch_size, self.p_dropout, self.n_in)
+
+        # self.inpt_dropout = aesara.tensor.nnet.dropout_layer(
+        #     inpt_dropout.reshape((mini_batch_size, self.n_in)),
+        #     self.p_dropout
+        # )
         self.output_dropout = aesara.tensor.nnet.softmax(
             aesara.tensor.dot(self.inpt_dropout, self.w) + self.b
         )

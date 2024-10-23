@@ -2,8 +2,11 @@ import chapter6.network3 as cnn
 import mnist_loader
 
 
-training_data, validation_data, test_data = mnist_loader.load_data_wrapper()
 mini_batch_size = 10
+
+#заюзать расширенный датасет
+training_data, validation_data, test_data = cnn.load_data_shared()
+
 
 net = cnn.Network([
         cnn.ConvPoolLayer(image_shape=(mini_batch_size, 1, 28, 28), 
@@ -31,6 +34,5 @@ net = cnn.Network([
                          p_dropout=0.5
                          )], 
         mini_batch_size)
-
-net.SGD(training_data, 40, mini_batch_size, 0.03, 
-            validation_data, test_data)
+# print(training_data)
+net.SGD(training_data, 40, mini_batch_size, 0.03, validation_data, test_data)
