@@ -5,8 +5,8 @@ import mnist_loader
 mini_batch_size = 10
 
 #заюзать расширенный датасет
-training_data, validation_data, test_data = cnn.load_data_shared()
-
+training_data, validation_data, test_data = cnn.load_data_shared("./data/mnist_expanded.pkl.gz")
+# ./data/mnist.pkl.gz
 
 net = cnn.Network([
         cnn.ConvPoolLayer(image_shape=(mini_batch_size, 1, 28, 28), 

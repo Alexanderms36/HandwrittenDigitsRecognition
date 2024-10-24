@@ -36,8 +36,8 @@ else:
             expanded_training_pairs.append((np.reshape(new_img, 784), y))
     random.shuffle(expanded_training_pairs)
     expanded_training_data = [list(d) for d in zip(*expanded_training_pairs)]
-    print("Saving expanded data. This may take a few minutes.")
+    print("Saving expanded data. This may take a few minutes")
     f = gzip.open("data/mnist_expanded.pkl.gz", "w")
     pickle.dump((expanded_training_data, validation_data, test_data), f)
     f.close()
-    
+    print("Done")

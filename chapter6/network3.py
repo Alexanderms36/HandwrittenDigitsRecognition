@@ -1,4 +1,7 @@
+import os
+os.environ['AESARA_FLAGS'] = 'device=cpu,floatX=float64'
 import aesara
+aesara.config.cxx = ''
 import numpy
 import gzip
 import pickle
@@ -7,7 +10,9 @@ import aesara.tensor.signal as signal
 # from aesara.tensor.signal import downsample
 from aesara.tensor.signal import pool
 from .dropout_layer import drp_lr
-
+from aesara import printing
+# from theano.tensor.nnet import softmax
+import aesara.tensor as at
 
 def linear(z):
     return z
@@ -18,7 +23,7 @@ def ReLU(z):
 def sigmoid(z):
     return 1 / (1 + aesara.tensor.exp(-z))
 
-def load_data_shared(filename="./data/mnist.pkl.gz"):
+def load_data_shared(filename):
     f = gzip.open(filename, 'rb')
     u = pickle._Unpickler(f)
     u.encoding = 'latin1'
@@ -58,18 +63,29 @@ class Network(object):
         training_x, training_y = training_data
         validation_x, validation_y = validation_data
         test_x, test_y = test_data
+        print("Check training data:", numpy.any(numpy.isnan(training_x.get_value())), 
+              numpy.any(numpy.isinf(training_x.get_value())))
+        print("Check validation data:", numpy.any(numpy.isnan(validation_x.get_value())), 
+              numpy.any(numpy.isinf(validation_x.get_value())))
 
-        num_training_batches = numpy.size(training_data) / mini_batch_size
-        num_validation_batches = numpy.size(validation_data) / mini_batch_size
-        num_test_batches = numpy.size(test_data) / mini_batch_size
+        print(f'size(training_data): {size(training_data)}')
+        print(f'mini_batch_size: {mini_batch_size}')
+
+        num_training_batches = int(size(training_data) / mini_batch_size)
+        print(f'num_training_batches: {num_training_batches}')
+        num_validation_batches = int(size(validation_data) / mini_batch_size) # = 0
+        num_test_batches = int(size(test_data) / mini_batch_size) # = 0
 
         l2_norm_squared = sum([(layer.w**2).sum() for layer in self.layers])
+
         cost = self.layers[-1].cost(self) + \
               0.5 * lmbda * l2_norm_squared / num_training_batches
+        #print(cost)
         grads = aesara.tensor.grad(cost, self.params)
-        updates = [(param, param - eta * grad)
+        updates = [(param, (param - eta * grad).astype(aesara.config.floatX)) 
                    for param, grad in zip(self.params, grads)]
-        
+
+
         i = aesara.tensor.lscalar()
         train_mb = aesara.function(
             [i],
@@ -107,7 +123,7 @@ class Network(object):
 
         self.test_mb_predictions = aesara.function(
             [i],
-            self.layers[-1].y_out(),
+            self.layers[-1].y_out,
             givens={
                 self.x:
                 test_x[i * self.mini_batch_size: (i + 1) * self.mini_batch_size]
@@ -115,7 +131,12 @@ class Network(object):
         )
 
         best_validation_accuracy = 0.0
+        # best_iteration = 0
+        # test_accuracy = 0.0
+        assert not numpy.any(numpy.isnan(training_x.get_value())), "Training data contains NaN values!"
+        assert not numpy.any(numpy.isinf(training_x.get_value())), "Training data contains infinite values!"   
         for epoch in range(epochs):
+            print(f'epoch: {epoch}')
             for minibatch_index in range(num_training_batches):
                 iteration = num_training_batches * epoch + minibatch_index
                 if (iteration % 1000 == 0):
@@ -263,11 +284,11 @@ class SoftmaxLayer(object):
 
     def set_inpt(self, inpt, inpt_dropout, mini_batch_size):
         self.inpt = inpt.reshape((mini_batch_size, self.n_in))
-        self.output = aesara.tensor.nnet.softmax(
-            (1 - self.p_dropout) * aesara.tensor.dot(self.inpt, self.w) + self.b
+        self.output = at.nnet.softmax(
+            (1 - self.p_dropout) * aesara.tensor.dot(self.inpt, self.w) + self.b,
+            axis=-1
         )
         self.y_out = aesara.tensor.argmax(self.output, axis=1)
-
 
         self.inpt_dropout = drp_lr(inpt_dropout, mini_batch_size, self.p_dropout, self.n_in)
 
@@ -276,12 +297,13 @@ class SoftmaxLayer(object):
         #     self.p_dropout
         # )
         self.output_dropout = aesara.tensor.nnet.softmax(
-            aesara.tensor.dot(self.inpt_dropout, self.w) + self.b
+            aesara.tensor.dot(self.inpt_dropout, self.w) + self.b,
+            axis=-1
         )
 
     def cost(self, net):
         return -aesara.tensor.mean(
-            aesara.tensor.log(self.output_dropout)[aesara.tensor.arrange(net.y.shape[0]),
+            aesara.tensor.log(self.output_dropout)[aesara.tensor.arange(net.y.shape[0]),
                                                     net.y]
         )
     
