@@ -131,8 +131,8 @@ class Network(object):
         )
 
         best_validation_accuracy = 0.0
-        # best_iteration = 0
-        # test_accuracy = 0.0
+        best_iteration = 0
+        test_accuracy = 0.0
         assert not numpy.any(numpy.isnan(training_x.get_value())), "Training data contains NaN values!"
         assert not numpy.any(numpy.isinf(training_x.get_value())), "Training data contains infinite values!"   
         for epoch in range(epochs):
