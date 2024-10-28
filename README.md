@@ -8,8 +8,8 @@ This repository contains an implementation of a neural network based on the mate
 - [Installation](#installation)
 - [Usage](#usage)
   - [Running the network from chapter 1](#running-the-chapter1)
-  - [Running the network from chapter 2](#running-the-chapter2)
   - [Running the network from chapter 3](#running-the-chapter3)
+  - [Running the network from chapter 6](#running-the-chapter6)
     - [Expand data](#expand-data)
     - [Running the network](#running-net)
 - [File Structure](#file-structure)
@@ -41,11 +41,17 @@ This repository contains an implementation of a neural network based on the mate
 ## Usage
 
 ### Running the network from chapter 1
-### Running the network from chapter 2
 
-
+To run the MLP from chapter 1:
+```py
+py train_network1.py
+```
 
 ### Running the network from chapter 3
+
+
+
+### Running the network from chapter 6
 
 It's useful to use expanded dataset to achieve a better accuracy. You can skip the next subparagraph if it's needed.
 
@@ -65,7 +71,15 @@ Or use methods from your IDE.
 
 #### Running the Script
 
+Now you can use `train_network3.py` to run the code from chapter 6 (Convolutional net)
+```bash
+py train_network3.py
+```
 
+Make sure the path to the data is correct:
+```py
+training_data, validation_data, test_data = cnn.load_data_shared("./data/mnist_expanded.pkl.gz")
+```
 
 ## File Structure
 

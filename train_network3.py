@@ -32,5 +32,5 @@ net = cnn.Network([
                          p_dropout=0.5
                          )], 
         mini_batch_size)
-# print(training_data)
+
 net.SGD(training_data, 40, mini_batch_size, 0.03, validation_data, test_data)
