@@ -94,8 +94,7 @@ class Network(object):
             if (monitor_evaluation_accuracy):
                 accuracy = self.accuracy(evaluation_data)
                 evaluation_accuracy.append(accuracy)
-                print(f'Accuracy on evaluation data: 
-                    {self.accuracy(evaluation_data), n_data}')            
+                print(f'Accuracy on evaluation data: {self.accuracy(evaluation_data)}, {n_data}')            
             
             print()
 
@@ -107,7 +106,7 @@ class Network(object):
         nabla_w = [numpy.zeros(w.shape) for w in self.weights]
 
         for x, y in mini_batch:
-            delta_nabla_b, delta_nabla_w = self.backprop()
+            delta_nabla_b, delta_nabla_w = self.backprop(x, y)
             nabla_b = [nb + dnb for nb, dnb in zip(nabla_b, delta_nabla_b)]
             nabla_w = [nw + dnw for nw, dnw in zip(nabla_w, delta_nabla_w)]
         
@@ -132,7 +131,7 @@ class Network(object):
             activations.append(activation)
         
         #backward pass
-        delta = (self.cost).delta(zs[-1], activation[-1], y)
+        delta = (self.cost).delta(zs[-1], activations[-1], y)
         nabla_b[-1] = delta
         nabla_w[-1] = numpy.dot(delta, activations[-2].transpose())
 
@@ -196,6 +195,7 @@ def vectorized_result(j):
     return e
 
 def sigmoid(z):
+    # z = numpy.clip(z, -500, 500)
     return 1.0 / (1.0 + numpy.exp(-z))
 
 def sigmoid_prime(z):
