@@ -43,13 +43,18 @@ This repository contains an implementation of a neural network based on the mate
 ### Running the network from chapter 1
 
 To run the MLP from chapter 1:
-```py
+
+```bash
 py train_network1.py
 ```
 
 ### Running the network from chapter 3
 
+To run the MLP from chapter 2:
 
+```bash
+py train_network2.py
+```
 
 ### Running the network from chapter 6
 
@@ -83,9 +88,17 @@ training_data, validation_data, test_data = cnn.load_data_shared("./data/mnist_e
 
 ## File Structure
 
-<!-- - `function.py`: Main Python script that contains the `draw_plots` function
-- `test_function.py`: Unit tests to verify the functionality of the methods in `function.py`
-- `Notebook.ipynb`: Jupyter notebook for interactive data analysis and visualization
-- `plots/`: Directory where generated plots are saved as .png pictures
-- `requirements.txt`: List of dependencies required to run the project
-- `deviation.json`: JSON data using for drawing plots -->
+ - `chapter1 folder`: The folder contains neural network architecture from chapter 1
+   - `network1.py`: Multilayer perceptron model class, `sigmoid()` and `sigmoid_prime` functions
+ - `chapter3 folder`: The folder for neural network architecture from chapter 3
+   - `network2.py`: Multilayer perceptron module from chapter 3
+ - `chapter6 folder`: The folder contains neural network architecture from chapter 1
+   - `network3.py`: CNN from chapter 6
+   - `dropout_layer.py`: Dropout layer module
+ - `expand_mnist.py`: Python file that expands MNIST dataset
+ - `mnist_loader.py`: Python module for loading a MNIST dataset into neural net to train
+ - `train_network1.py`: Python file launching code from chapter 1
+ - `train_network2.py`: Python file launching code from chapter 3
+ - `train_network3.py`: Python file launching code from chapter 6
+ - `requirements.txt`: List of dependencies required to run the project
+ 
